@@ -1,0 +1,17 @@
+{
+  "name": "bsc-apr-monitor",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "graphql-request": "^7.2.0",
+    "graphql-tag": "^2.12.6"
+  }
+}
