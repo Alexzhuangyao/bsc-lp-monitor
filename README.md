@@ -43,7 +43,7 @@ npm start
 npm install --legacy-peer-deps
 ```
 
-应用将在 http://localhost:3000 启动
+应用将在 http://localhost:3333 启动
 
 ## 使用指南
 
