@@ -26,14 +26,21 @@
 cd bsc-lp-monitor
 ```
 
-2. 安装依赖并运行
+2.(可选)修改配置
+```bash
+vi .env
+
+在文件中修改更佳的RPC节点
+quicknode
+blockpi
+或者自建节点
+填入BSC_RPC_NODE_1 BSC_RPC_NODE_2 BSC_RPC_NODE_3
+```
+
+3. 安装依赖并运行
 ```bash
 # 安装客户端依赖
 cd client
-npm install
-npm start
-# 安装服务端依赖
-cd ../server
 npm install
 npm start
 ```
@@ -50,19 +57,23 @@ npm install --legacy-peer-deps
 ### 初始设置
 
 1. **连接钱包**
-   - 点击右上角的齿轮按钮
    - 输入私钥
    - 点击导入钱包
+   (数据全部保存在本地)
 
 2. **配置监控策略**
    - 在仓位列表中选择要监控的 LP 仓位（若为首次监测到的LP，将自动开启监控和策略）
    - 配置自动操作选项（撤池、重组等）
 
+3. **自行选择pancake的LP池，添加流动性**
+   - 自行选择LP池，推荐币安alpha的币种对应的LP或者直接在pancke的LP页面挑选 https://pancakeswap.finance/liquidity/pools?sort=lpApr%3A-1
+   - 自行了解LP相关知识，包括无常损失等
+
 ### 监控操作
 
 1. **开启监控**
    - 在仓位列表中找到目标仓位
-   - 切换监控开关到"开启"状态
+   - 切换监控开关到"开启"状态(新监测到LP仓位即为开启状态)
    - 观察状态变化和操作记录
 
 2. **查看详情**
@@ -74,7 +85,7 @@ npm install --legacy-peer-deps
    - 确认交易并等待确认
    - 查看操作结果和代币余额
 
-### 自动化策略说明
+### 自动化策略说明(目前仅支持USDT和WBNB池的自动策略)
 
 1. **涨超区间策略**
    ```
@@ -88,7 +99,7 @@ npm install --legacy-peer-deps
    ```
    当价格低于下限时：
    1. 自动撤池
-   2. 将代币全部换成 USDT
+   2. 将代币全部换成 USDT/BNB
    3. 等待更好的入场机会
    ```
 
@@ -96,8 +107,7 @@ npm install --legacy-peer-deps
    ```
    当价格跌破预设阈值时：
    1. 自动撤池
-   2. 将代币全部换成 USDT
-   3. 等待更好的入场机会
+   2. 将代币全部换成 USDT/BNB
    ```
 
 ## 常见问题
