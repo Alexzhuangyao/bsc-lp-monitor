@@ -34,7 +34,10 @@ vi .env
 quicknode
 blockpi
 或者自建节点
-填入BSC_RPC_NODE_1 BSC_RPC_NODE_2 BSC_RPC_NODE_3
+填入
+BSC_RPC_NODE_1 
+BSC_RPC_NODE_2 
+BSC_RPC_NODE_3
 ```
 
 3. 安装依赖并运行
