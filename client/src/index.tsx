@@ -1,19 +1,29 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { ChakraProvider } from '@chakra-ui/react';
+import { HashRouter, Routes, Route } from 'react-router-dom';
+import WalletManager from './pages/WalletManager';
+import { initWeb3 } from './utils/web3';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
-import App from './App';
-import reportWebVitals from './reportWebVitals';
+
+// Initialize Web3
+initWeb3();
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
+
 root.render(
   <React.StrictMode>
-    <App />
+    <ChakraProvider>
+      <ErrorBoundary>
+        <HashRouter>
+          <Routes>
+            <Route path="*" element={<WalletManager />} />
+          </Routes>
+        </HashRouter>
+      </ErrorBoundary>
+    </ChakraProvider>
   </React.StrictMode>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

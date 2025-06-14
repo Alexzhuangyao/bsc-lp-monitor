@@ -171,13 +171,6 @@ function WalletManager() {
     <Container maxW="container.md" py={8}>
       <VStack spacing={6} align="stretch">
         <HStack justify="space-between" align="center">
-          <IconButton
-            icon={<ArrowBackIcon />}
-            onClick={() => navigate('/')}
-            variant="ghost"
-            aria-label="Back to home"
-            size="lg"
-          />
           <Heading size="lg">Wallet Manager</Heading>
           <Box w={10} /> {/* 为了保持标题居中的占位元素 */}
         </HStack>
