@@ -2,12 +2,29 @@ const express = require('express');
 const cors = require('cors');
 const { Web3 } = require('web3');
 const dotenv = require('dotenv');
-const axios = require('axios');
-const { gql } = require('graphql-tag');
-const { GraphQLClient } = require('graphql-request');
+const path = require('path');
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from project root
+dotenv.config({ path: path.join(__dirname, '../../.env') });
+
+// 添加调试信息
+console.log('环境变量加载情况:', {
+    BSC_RPC_NODE_1: process.env.BSC_RPC_NODE_1,
+    BSC_RPC_NODE_2: process.env.BSC_RPC_NODE_2,
+    BSC_RPC_NODE_3: process.env.BSC_RPC_NODE_3
+});
+
+// 从环境变量获取RPC节点配置
+const BSC_RPC_NODES = [
+    process.env.BSC_RPC_NODE_1 || 'https://bsc.publicnode.com',
+    process.env.BSC_RPC_NODE_2,
+    process.env.BSC_RPC_NODE_3
+].filter(Boolean); // 过滤掉未定义的值
+
+if (BSC_RPC_NODES.length === 0) {
+    console.error('错误: 未配置任何BSC RPC节点。请在.env文件中设置至少一个RPC节点。');
+    process.exit(1);
+}
 
 const app = express();
 
@@ -153,13 +170,6 @@ class RateLimiter {
         return this.getToken();
     }
 }
-
-const BSC_RPC_NODES = [
-    'https://bsc.publicnode.com',
-    // 'https://binance.nodereal.io',
-    'https://polished-lively-wish.bsc.quiknode.pro/a6294fdf2e2a8bfe9973c40a4be7f6c3e668ff66/',
-    'https://bsc.blockpi.network/v1/rpc/1f9d3044108b9231d6c1cf98de73b08914cf6d3a'
-  ];
 
 let currentNodeIndex = 0;
 
