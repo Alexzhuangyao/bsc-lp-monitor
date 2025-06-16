@@ -1992,7 +1992,7 @@ function LPPositions({ walletAddress, privateKey }) {
               // 执行添加流动性
               const mintTx = await positionManager.mint(...mintParams, {
                 gasLimit: 1000000,
-                gasPrice: ethers.parseUnits('0.15', 'gwei')
+                gasPrice: ethers.parseUnits('1', 'gwei')
               });
               
               const mintReceipt = await mintTx.wait();

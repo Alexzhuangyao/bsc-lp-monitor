@@ -99,8 +99,9 @@ const getQuote = async ({ fromTokenAddress, toTokenAddress, amount, slippage, us
       swapMode: 'exactIn',  // 使用exactIn模式，表示amount是输入金额
       fromTokenAddress,
       toTokenAddress,
-      slippage: slippage || '0.005',
+      slippage: slippage || '0.05',
       userWalletAddress,
+      autoSlippage: true
     };
     
     const queryString = new URLSearchParams(queryParams).toString();
@@ -187,7 +188,7 @@ const sendSwapTransaction = async (params) => {
       swapMode: 'exactIn',
       fromTokenAddress: params.fromTokenAddress,
       toTokenAddress: params.toTokenAddress,
-      slippage: params.slippage || '0.5',
+      slippage: params.slippage || '0.05',
       userWalletAddress: params.userWalletAddress,
       autoSlippage: true
     };
@@ -376,7 +377,8 @@ const executeSwap = async (params) => {
       fromTokenAddress: params.fromTokenAddress,
       toTokenAddress: params.toTokenAddress,
       amount: params.amount,
-      slippage: params.slippage || '1',
+      slippage: params.slippage || '0.05',
+      autoSlippage: true,
       swapMode: 'exactIn',
       deadline: Math.floor(Date.now() / 1000) + 60 * 20, // 20分钟后过期
     });
