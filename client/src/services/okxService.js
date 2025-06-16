@@ -379,7 +379,7 @@ const executeSwap = async (params) => {
       fromTokenAddress: params.fromTokenAddress,
       toTokenAddress: params.toTokenAddress,
       amount: params.amount,
-      slippage: params.slippage || '0.05',
+      slippage: params.slippage || '0.005',
       autoSlippage: true,
       maxAutoSlippage: '0.1',
       swapMode: 'exactIn',

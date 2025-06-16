@@ -308,12 +308,12 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
 
       console.log('📊 获取交换交易数据...');
       const swapResult = await sendSwapTransaction({
-          fromTokenAddress: BSC_TOKENS[fromToken].address,
-          toTokenAddress: BSC_TOKENS[toToken].address,
-          amount: amountInWei,
-          slippage: '0.5',
-          userWalletAddress: walletAddress,
-          privateKey
+        fromTokenAddress: BSC_TOKENS[fromToken].address,
+        toTokenAddress: BSC_TOKENS[toToken].address,
+        amount: amountInWei.toString(),
+        slippage: '0.005',
+        userWalletAddress: walletAddress,
+        privateKey
       });
 
       if (!swapResult || !swapResult.hash) {
@@ -445,7 +445,7 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
             fromTokenAddress: BSC_TOKENS[fromToken].address,
             toTokenAddress: BSC_TOKENS[toToken].address,
             amount: amountInWei,
-            slippage: '1'
+            slippage: '0.005'
           });
 
           console.log('刷新报价结果:', quoteResult);
@@ -489,7 +489,7 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
         fromTokenAddress: BSC_TOKENS[fromToken].address,
         toTokenAddress: BSC_TOKENS[toToken].address,
         amount: amountInWei,
-        slippage: '1'
+        slippage: '0.005'
       });
 
       console.log('手动刷新报价结果:', quoteResult);
