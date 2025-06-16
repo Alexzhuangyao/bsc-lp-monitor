@@ -205,25 +205,6 @@ const getCurrentTick = async (poolAddress, provider) => {
   }
 };
 
-// 修改节点状态记录
-const nodeFailures = {
-  failCount: {},     // 记录每个节点的失败次数
-  lastFailTime: {},  // 记录每个节点的最后失败时间
-  lastSuccessTime: {}, // 记录每个节点的最后成功时间
-  currentProvider: null, // 当前使用的provider
-  lastProviderChange: 0, // 最后一次切换provider的时间
-};
-
-// 修改退避配置
-const BACKOFF_CONFIG = {
-  maxFailures: 3,           // 最大失败次数
-  backoffTime: 5 * 60000,   // 退避时间（5分钟）
-  resetTime: 15 * 60000,    // 重置失败计数的时间（15分钟）
-  minProviderSwitchInterval: 10000, // 最小provider切换间隔（10秒）
-  maxRetries: 3,            // 最大重试次数
-  retryDelay: 2000,         // 重试延迟（2秒）
-};
-
 // 添加更多BSC RPC节点
 const BSC_RPC_ENDPOINTS = [
   'https://bsc-dataseed.binance.org',
@@ -1835,13 +1816,6 @@ function LPPositions({ walletAddress, privateKey }) {
       const hasUSDT = isToken0USDT || isToken1USDT;
       const hasWBNB = isToken0WBNB || isToken1WBNB;
 
-      console.log('isToken0USDT:', isToken0USDT);
-      console.log('isToken1USDT:', isToken1USDT);
-      console.log('isToken0WBNB:', isToken0WBNB);
-      console.log('isToken1WBNB:', isToken1WBNB);
-      console.log('hasUSDT:', hasUSDT);
-      console.log('hasWBNB:', hasWBNB);
-
       if (hasUSDT || hasWBNB) {
         const stableToken = hasUSDT ? 'USDT' : 'WBNB';
         console.log(`TokenID ${position.tokenId} 包含${stableToken}，准备执行代币交换`);
@@ -2296,13 +2270,6 @@ function LPPositions({ walletAddress, privateKey }) {
             </HStack>
   );
 
-
-
-  // 修改 setSelectedPosition 的调用方式
-  const handleSelectPosition = useCallback((position) => {
-    setSelectedPosition(position);
-  }, []);
-
   // 添加刷新详细信息的函数
   const refreshPositionDetails = useCallback(async () => {
     if (!selectedPosition || !selectedPosition.tokenId) return;
@@ -2339,96 +2306,6 @@ function LPPositions({ walletAddress, privateKey }) {
       });
     }
   }, [selectedPosition, closedPool, toast]);
-
-  // 更新 renderPositions 中的 onClick
-  const renderPositions = () => {
-    return positions.map((position) => {
-      // 计算价格范围百分比
-      const leftPercentage = ((Number(position.currentTick) - Number(position.tickLower)) / 10000 * 100).toFixed(2);
-      const rightPercentage = ((Number(position.tickUpper) - Number(position.currentTick)) / 10000 * 100).toFixed(2);
-      
-      return (
-        <Tr
-          key={position.tokenId}
-          cursor="pointer"
-          _hover={{ bg: "gray.50" }}
-          bg={selectedPosition?.tokenId === position.tokenId ? "blue.50" : ""}
-          onClick={() => handleSelectPosition(position)}
-        >
-          <Td minWidth="80px" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-            {position.tokenId}
-          </Td>
-          <Td minWidth="100px">
-            <Tooltip label={`${position.token0Symbol}/${position.token1Symbol}`}>
-              <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-                {position.token0Symbol}/{position.token1Symbol}
-              </Text>
-            </Tooltip>
-          </Td>
-          <Td minWidth="180px">
-            <Tooltip label={`当前Tick: ${position.currentTick?.toString()}
-最小Tick: ${position.tickLower?.toString()}
-最大Tick: ${position.tickUpper?.toString()}
-当前价格: ${position.currentPrice}
-价格区间: ${position.lowerPrice} - ${position.upperPrice}`}>
-              <Text fontSize="sm" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-                {position.tickLower?.toString()} ~ {position.currentTick?.toString()} ~ {position.tickUpper?.toString()}
-              </Text>
-            </Tooltip>
-          </Td>
-          <Td minWidth="120px">
-            <Tooltip label={`左边界距离: ${leftPercentage}%
-右边界距离: ${rightPercentage}%
-当前价格: ${position.currentPrice}
-价格区间: ${position.lowerPrice} - ${position.upperPrice}
-状态: ${position.isActive ? '价格在区间内' : '价格超出区间'}`}>
-              <Box
-                p={1}
-                borderRadius="md"
-                bg={position.isActive ? 'green.100' : 'red.100'}
-                color={position.isActive ? 'green.800' : 'red.800'}
-              >
-                <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap">
-                  {leftPercentage}% ~ {rightPercentage}%
-                </Text>
-              </Box>
-            </Tooltip>
-          </Td>
-          <Td minWidth="80px">
-            <Switch
-              colorScheme="green"
-              isChecked={Boolean(monitoringStates[position.tokenId])}
-              onChange={(e) => {
-                e.stopPropagation();
-                console.log('切换监控状态:', {
-                  tokenId: position.tokenId,
-                  currentState: monitoringStates[position.tokenId],
-                  newState: e.target.checked,
-                  allStates: monitoringStates
-                });
-                handleMonitoringChange(position.tokenId, e.target.checked);
-              }}
-              size="md"
-            />
-          </Td>
-          <Td minWidth="80px">
-            <Button
-              size="sm"
-              colorScheme="red"
-              isLoading={removingLiquidity}
-              onClick={(e) => {
-                setSelectedPosition(position);
-                onOpen();
-                e.stopPropagation();
-              }}
-            >
-              撤池
-            </Button>
-          </Td>
-        </Tr>
-      );
-    });
-  };
 
   return (
     <VStack spacing={4} align="stretch" width="100%">

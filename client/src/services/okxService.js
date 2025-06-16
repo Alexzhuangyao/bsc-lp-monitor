@@ -1,26 +1,11 @@
 import crypto from 'crypto-js';
-import { ethers, JsonRpcProvider, Wallet, parseUnits } from 'ethers';
+import { ethers } from 'ethers';
 
 const BASE_URL = 'https://web3.okx.com/api/v5';  // 修改基础URL，移除api/v5
 const PROJECT_ID = '9d968a69b402cec5d8b4c99297876f63';
 const ACCESS_KEY = 'efc9f38f-761a-43b6-ac11-64f85060621b';
 const SECRET_KEY = 'FC46AA60301DC450A68114BBD7FAA8B4'; // 需要替换为实际的密钥
 const PASSPHRASE = 'J6AuhK-kTeZ-pG2';
-
-// OKX DEX Router合约地址
-const OKX_DEX_ROUTER = '0x9b9efa5Efa731EA9Bbb0369E91fA17Abf249CFD4';
-
-// OKX DEX Router ABI
-const OKX_DEX_ROUTER_ABI = [
-  'function WETH() external pure returns (address)',
-  'function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)',
-  'function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)',
-  'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)',
-  'function swapExactTokensForTokensSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)',
-  'function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)',
-  'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)',
-  'function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts)'
-];
 
 // BSC链的配置
 const BSC_CONFIG = {
@@ -76,18 +61,6 @@ const BSC_CONFIG = {
     BABY_DOGE: '0xfb719654604f44Df1D5CbfeA736095444D5F6c88'
   }
 };
-
-// DEX Router ABI
-const DEX_ROUTER_ABI = [
-  'function WETH() external pure returns (address)',
-  'function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)',
-  'function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)',
-  'function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)',
-  'function swapExactTokensForTokensSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)',
-  'function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)',
-  'function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)',
-  'function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts)'
-];
 
 // 生成签名
 const generateSignature = (timestamp, method, requestPath, body = '') => {
@@ -194,146 +167,6 @@ const getQuote = async ({ fromTokenAddress, toTokenAddress, amount, slippage, us
   }
 };
 
-// 检查代币授权并在需要时进行授权
-const checkAndApproveToken = async (tokenAddress, walletAddress, amount, provider) => {
-  try {
-    // 创建ERC20代币合约实例
-    const tokenContract = new ethers.Contract(
-      tokenAddress,
-      ['function allowance(address owner, address spender) external view returns (uint256)'],
-      provider
-    );
-
-    // 检查当前授权额度
-    const currentAllowance = await tokenContract.allowance(walletAddress, BSC_CONFIG.APPROVE_ROUTER);
-    console.log('Current allowance:', currentAllowance.toString());
-    
-    // 如果当前授权额度小于要交易的金额，则需要授权
-    if (currentAllowance < amount) {
-      console.log('Token needs approval');
-      
-      // 获取授权交易数据
-      const timestamp = new Date().toISOString();
-      const method = 'GET';
-      const queryString = new URLSearchParams({
-        chainIndex: BSC_CONFIG.chainIndex,
-        tokenContractAddress: tokenAddress,
-        approveAmount: ethers.MaxUint256.toString() // 使用最大值进行授权
-      }).toString();
-
-      const requestPath = `/api/v5/dex/aggregator/approve-transaction?${queryString}`;
-      const signature = generateSignature(timestamp, method, requestPath);
-
-      const headers = {
-        'OK-ACCESS-KEY': ACCESS_KEY,
-        'OK-ACCESS-SIGN': signature,
-        'OK-ACCESS-TIMESTAMP': timestamp,
-        'OK-ACCESS-PASSPHRASE': PASSPHRASE,
-        'OK-ACCESS-PROJECT': PROJECT_ID,
-        'Content-Type': 'application/json'
-      };
-
-      console.log('Requesting approve transaction:', `${BASE_URL}${requestPath}`);
-      
-      const response = await fetch(`${BASE_URL}${requestPath}`, {
-        method: 'GET',
-        headers
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log('Approve transaction response:', data);
-
-      if (data.code === '0' && data.data.length > 0) {
-        const approveData = data.data[0];
-        
-        // 构建授权交易
-        const txRequest = {
-          to: approveData.dexContractAddress,
-          data: approveData.data,
-          gasLimit: ethers.toBigInt(approveData.gasLimit),
-          gasPrice: ethers.parseUnits('0.1', 'gwei')
-        };
-
-        console.log('Sending approve transaction:', txRequest);
-
-        // 发送授权交易
-        const tx = await provider.sendTransaction(txRequest);
-        console.log('Approve transaction sent:', tx.hash);
-
-        // 等待交易确认
-        const receipt = await tx.wait();
-        console.log('Approve transaction confirmed:', receipt);
-
-        return true;
-      }
-
-      throw new Error(data.msg || 'Failed to get approve transaction data');
-    }
-    
-    console.log('Token already approved');
-    return true;
-  } catch (error) {
-    console.error('Error in token approval:', error);
-    throw error;
-  }
-};
-
-// 获取swap交易数据
-const getSwapTransactionData = async (params) => {
-  try {
-    const timestamp = new Date().toISOString();
-    const method = 'POST';
-    const requestPath = '/api/v5/dex/aggregator/swap';
-    
-    const body = JSON.stringify({
-      chainIndex: BSC_CONFIG.chainIndex,
-      fromTokenAddress: params.fromTokenAddress,
-      toTokenAddress: params.toTokenAddress,
-      amount: params.amount,
-      slippage: '1',
-      userWalletAddress: params.userWalletAddress,
-      swapMode: 'exactIn',
-      deadline: Math.floor(Date.now() / 1000) + 60 * 20 // 20分钟后过期
-    });
-
-    const signature = generateSignature(timestamp, method, requestPath, body);
-
-    const headers = {
-      'OK-ACCESS-KEY': ACCESS_KEY,
-      'OK-ACCESS-SIGN': signature,
-      'OK-ACCESS-TIMESTAMP': timestamp,
-      'OK-ACCESS-PASSPHRASE': PASSPHRASE,
-      'OK-ACCESS-PROJECT': PROJECT_ID,
-      'Content-Type': 'application/json'
-    };
-
-    const response = await fetch(`${BASE_URL}${requestPath}`, {
-      method: 'POST',
-      headers,
-      body
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
-
-    const data = await response.json();
-    if (data.code === '0') {
-      return data.data[0];
-    }
-    throw new Error(data.msg || 'Failed to get swap transaction data');
-  } catch (error) {
-    console.error('Error getting swap transaction:', error);
-    throw error;
-  }
-};
-
 // 修改sendSwapTransaction函数
 const sendSwapTransaction = async (params) => {
   try {
@@ -393,11 +226,6 @@ const sendSwapTransaction = async (params) => {
     const provider = new ethers.JsonRpcProvider(BSC_CONFIG.RPC_URL);
     const wallet = new ethers.Wallet(params.privateKey, provider);
 
-    // 获取当前gas价格
-    console.log('⛽ 获取gas价格...');
-    const feeData = await provider.getFeeData();
-    const gasPrice = ethers.toBigInt(feeData.gasPrice) * ethers.toBigInt(12) / ethers.toBigInt(10); // 使用1.2倍gas价格
-
     // 获取nonce
     const nonce = await provider.getTransactionCount(params.userWalletAddress, 'latest');
 
@@ -407,7 +235,7 @@ const sendSwapTransaction = async (params) => {
       data: txData.data,
       value: txData.value || '0',
       gasLimit: ethers.toBigInt('500000'), // 固定gas限制
-      gasPrice: gasPrice,
+      gasPrice: ethers.parseUnits('1', 'gwei'),
       nonce: nonce,
       chainId: 56 // BSC的chainId
     };

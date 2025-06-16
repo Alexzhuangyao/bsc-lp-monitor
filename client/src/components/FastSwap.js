@@ -55,19 +55,19 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
 
   // 自动获取报价的防抖处理
   const debouncedFetchQuote = useCallback(
-    debounce((amount, fromToken, toToken) => {
+    (amount, fromToken, toToken) => {
       if (!amount || amount <= 0 || !fromToken || !toToken) {
         console.log('跳过报价查询 - 无效参数:', { amount, fromToken, toToken });
         return;
       }
 
       const fetchQuote = async () => {
-    try {
-      setLoading(true);
+        try {
+          setLoading(true);
           console.log('获取报价，参数:', { fromToken, toToken, amount });
           
-      const fromTokenDecimals = BSC_TOKENS[fromToken].decimals;
-      const amountInWei = ethers.parseUnits(amount, fromTokenDecimals).toString();
+          const fromTokenDecimals = BSC_TOKENS[fromToken].decimals;
+          const amountInWei = ethers.parseUnits(amount, fromTokenDecimals).toString();
 
           console.log('准备参数:', {
             fromTokenAddress: BSC_TOKENS[fromToken].address,
@@ -77,26 +77,25 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
           });
 
           const quoteResult = await getQuote({
-          fromTokenAddress: BSC_TOKENS[fromToken].address,
-          toTokenAddress: BSC_TOKENS[toToken].address,
-          amount: amountInWei,
-          slippage: '0.005',
-          userWalletAddress: walletAddress
-      });
+            fromTokenAddress: BSC_TOKENS[fromToken].address,
+            toTokenAddress: BSC_TOKENS[toToken].address,
+            amount: amountInWei,
+            slippage: '0.005',
+            userWalletAddress: walletAddress
+          });
 
           console.log('报价结果:', quoteResult);
           
-          // 检查返回的数据结构
           if (quoteResult && 
               typeof quoteResult === 'object' && 
               'toTokenAmount' in quoteResult &&
               'priceImpactPercentage' in quoteResult) {
             setQuote(quoteResult);
-      } else {
+          } else {
             console.error('无效的报价数据:', quoteResult);
             throw new Error('获取报价失败: 返回数据格式不正确');
-      }
-    } catch (error) {
+          }
+        } catch (error) {
           console.error('获取报价错误:', error);
           console.error('错误详情:', {
             message: error.message,
@@ -104,7 +103,6 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
             name: error.name
           });
           
-          // 更详细的错误提示
           let errorMessage = error.message;
           if (error.response) {
             try {
@@ -115,23 +113,28 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
             }
           }
           
-      toast({
+          toast({
             title: '报价错误',
             description: errorMessage,
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          });
           
-          // 清除之前的报价
           setQuote(null);
-    } finally {
-      setLoading(false);
-    }
+        } finally {
+          setLoading(false);
+        }
       };
 
-      fetchQuote();
-    }, 500),
+      const debouncedFetch = debounce(fetchQuote, 500);
+      debouncedFetch();
+
+      // 清理函数
+      return () => {
+        debouncedFetch.cancel();
+      };
+    },
     [walletAddress, toast, setLoading, setQuote]
   );
 
@@ -300,10 +303,6 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
     try {
       setSwapping(true);
       console.log('🚀 开始执行BSC链代币交换...');
-
-      const provider = new ethers.JsonRpcProvider(BSC_RPC);
-      const wallet = new ethers.Wallet(privateKey, provider);
-
       // 1. 获取交换数据
       const amountInWei = ethers.parseUnits(amount, BSC_TOKENS[fromToken].decimals).toString();
 
