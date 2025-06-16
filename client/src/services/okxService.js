@@ -101,7 +101,8 @@ const getQuote = async ({ fromTokenAddress, toTokenAddress, amount, slippage, us
       toTokenAddress,
       slippage: slippage || '0.05',
       userWalletAddress,
-      autoSlippage: true
+      autoSlippage: true,
+      maxAutoSlippage: '0.1'
     };
     
     const queryString = new URLSearchParams(queryParams).toString();
@@ -190,7 +191,8 @@ const sendSwapTransaction = async (params) => {
       toTokenAddress: params.toTokenAddress,
       slippage: params.slippage || '0.05',
       userWalletAddress: params.userWalletAddress,
-      autoSlippage: true
+      autoSlippage: true,
+      maxAutoSlippage: '0.1'
     };
     
     const queryString = new URLSearchParams(queryParams).toString();
@@ -379,6 +381,7 @@ const executeSwap = async (params) => {
       amount: params.amount,
       slippage: params.slippage || '0.05',
       autoSlippage: true,
+      maxAutoSlippage: '0.1',
       swapMode: 'exactIn',
       deadline: Math.floor(Date.now() / 1000) + 60 * 20, // 20分钟后过期
     });

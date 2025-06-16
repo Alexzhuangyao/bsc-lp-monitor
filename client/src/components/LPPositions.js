@@ -906,7 +906,7 @@ function LPPositions({ walletAddress, privateKey }) {
           fromTokenAddress,
           toTokenAddress,
           amount: amountBigInt.toString(),
-          slippage: '0.5',
+          slippage: '0.05',
           userWalletAddress: walletAddress,
           privateKey
         });
