@@ -23,10 +23,8 @@ import { ArrowDownIcon, ExternalLinkIcon, RepeatIcon } from '@chakra-ui/icons';
 import { ethers } from 'ethers';
 import { 
   getQuote, 
-  BSC_TOKENS, 
-  sendSwapTransaction, 
-  checkAllowanceFromService, 
-  getApproveTransaction,
+  BSC_TOKENS,
+  sendSwapTransaction,
   BSC_CONFIG 
 } from '../services/okxService';
 import { debounce } from 'lodash';
@@ -40,9 +38,6 @@ const ERC20_ABI = [
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 value) returns (bool)'
 ];
-
-// DEX路由合约地址
-const DEX_ROUTER = '0x9b9efa5Efa731EA9Bbb0369E91fA17Abf249CFD4';
 
 function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
   const [fromToken, setFromToken] = useState('BNB');

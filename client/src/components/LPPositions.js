@@ -27,11 +27,6 @@ import {
   ModalBody,
   ModalFooter,
   Switch,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
   Input,
   InputGroup,
   InputLeftElement,
@@ -229,114 +224,61 @@ const BACKOFF_CONFIG = {
   retryDelay: 2000,         // 重试延迟（2秒）
 };
 
-// 添加 BSC RPC 节点列表
-const BSC_RPC_NODES = [
-  'https://bsc.publicnode.com',
-  // 'https://binance.nodereal.io',
-  'https://polished-lively-wish.bsc.quiknode.pro/a6294fdf2e2a8bfe9973c40a4be7f6c3e668ff66/',
-  'https://bsc.blockpi.network/v1/rpc/1f9d3044108b9231d6c1cf98de73b08914cf6d3a'
+// 添加更多BSC RPC节点
+const BSC_RPC_ENDPOINTS = [
+  'https://bsc-dataseed.binance.org',
+  'https://bsc-dataseed1.binance.org',
+  'https://bsc-dataseed2.binance.org',
+  'https://bsc-dataseed3.binance.org',
+  'https://bsc-dataseed4.binance.org',
+  'https://bsc-dataseed1.defibit.io',
+  'https://bsc-dataseed2.defibit.io',
+  'https://bsc-dataseed3.defibit.io',
+  'https://bsc-dataseed4.defibit.io',
+  'https://bsc-dataseed1.ninicoin.io',
+  'https://bsc-dataseed2.ninicoin.io',
+  'https://bsc-dataseed3.ninicoin.io',
+  'https://bsc-dataseed4.ninicoin.io',
+  'https://endpoints.omniatech.io/v1/bsc/mainnet/public',
+  'https://1rpc.io/bnb'
 ];
 
 // 修改 getWorkingProvider 函数
 const getWorkingProvider = async (forceNew = false) => {
-  try {
-    const now = Date.now();
+  const maxRetries = BSC_RPC_ENDPOINTS.length;
+  let lastError;
+  let attempts = 0;
 
-    // 如果已有可用的provider且不需要强制更新，直接返回
-    if (!forceNew && 
-        nodeFailures.currentProvider && 
-        (now - nodeFailures.lastProviderChange) < BACKOFF_CONFIG.minProviderSwitchInterval) {
-      return nodeFailures.currentProvider;
-    }
+  // 随机打乱RPC节点顺序
+  const shuffledEndpoints = [...BSC_RPC_ENDPOINTS]
+    .sort(() => Math.random() - 0.5);
 
-  // 过滤掉处于退避期的节点
-  const availableNodes = BSC_RPC_NODES.filter(rpcUrl => {
-    const failCount = nodeFailures.failCount[rpcUrl] || 0;
-    const lastFailTime = nodeFailures.lastFailTime[rpcUrl] || 0;
-      const lastSuccessTime = nodeFailures.lastSuccessTime[rpcUrl] || 0;
-      
-      // 如果节点最近成功过，重置失败计数
-      if (lastSuccessTime > lastFailTime) {
-        nodeFailures.failCount[rpcUrl] = 0;
-        return true;
-      }
-    
-    // 如果失败次数超过阈值且在退避期内
-    if (failCount >= BACKOFF_CONFIG.maxFailures && 
-        (now - lastFailTime) < BACKOFF_CONFIG.backoffTime) {
-        console.log(`节点 ${rpcUrl} 处于退避期，剩余时间: ${Math.round((BACKOFF_CONFIG.backoffTime - (now - lastFailTime)) / 1000)}秒`);
-      return false;
-    }
-    
-    // 如果超过重置时间，重置失败计数
-    if ((now - lastFailTime) > BACKOFF_CONFIG.resetTime) {
-      nodeFailures.failCount[rpcUrl] = 0;
-    }
-    
-    return true;
-  });
-
-  if (availableNodes.length === 0) {
-    console.warn('所有节点都处于退避期，重置所有节点状态');
-    nodeFailures.failCount = {};
-    nodeFailures.lastFailTime = {};
-      return getWorkingProvider(true);
-    }
-
-    // 按照上次成功时间排序，优先使用最近成功的节点
-    availableNodes.sort((a, b) => {
-      const aSuccess = nodeFailures.lastSuccessTime[a] || 0;
-      const bSuccess = nodeFailures.lastSuccessTime[b] || 0;
-      return bSuccess - aSuccess;
-    });
-
-    // 尝试连接节点
-    for (const rpcUrl of availableNodes) {
+  for (const rpcUrl of shuffledEndpoints) {
+    attempts++;
     try {
-      // 检查是否可以发送请求
-      const canRequest = await RPC_RATE_LIMIT.waitForAvailability(rpcUrl);
-      if (!canRequest) {
-          console.log(`节点 ${rpcUrl} 请求频率超限，尝试下一个节点`);
-        continue;
-      }
-
-        console.log('尝试连接RPC节点:', rpcUrl);
+      console.log(`尝试连接RPC节点 (${attempts}/${maxRetries}): ${rpcUrl}`);
+      
       const provider = new ethers.JsonRpcProvider(rpcUrl);
-        
-        // 设置超时时间为5秒
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('RPC请求超时')), 5000);
-        });
-        
+      
       // 测试连接
-        const blockNumberPromise = provider.getBlockNumber();
-        const blockNumber = await Promise.race([blockNumberPromise, timeoutPromise]);
+      await provider.getBlockNumber();
       
-        // 连接成功，更新节点状态
-        nodeFailures.lastSuccessTime[rpcUrl] = now;
-      nodeFailures.failCount[rpcUrl] = 0;
-      delete nodeFailures.lastFailTime[rpcUrl];
-      
-        // 更新当前provider
-        nodeFailures.currentProvider = provider;
-        nodeFailures.lastProviderChange = now;
-        
-        console.log('成功连接到RPC节点:', rpcUrl, '当前区块:', blockNumber);
+      console.log(`✅ 成功连接到RPC节点: ${rpcUrl}`);
       return provider;
     } catch (error) {
-        console.error(`RPC节点连接失败 ${rpcUrl}:`, error.message);
-      // 记录失败
-      nodeFailures.failCount[rpcUrl] = (nodeFailures.failCount[rpcUrl] || 0) + 1;
-      nodeFailures.lastFailTime[rpcUrl] = now;
-      continue;
+      console.warn(`❌ RPC节点连接失败 (${rpcUrl}):`, error.message);
+      lastError = error;
+      
+      // 如果是最后一次尝试，等待一段时间再重试
+      if (attempts === maxRetries) {
+        console.log('所有RPC节点都连接失败，等待5秒后重试...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        attempts = 0; // 重置尝试次数，继续尝试
+      }
     }
   }
 
-    throw new Error('无法连接到任何RPC节点');
-  } catch (error) {
-    console.error('获取RPC Provider失败:', error);
-    throw error;
-  }
+  throw new Error(`无法连接到任何RPC节点: ${lastError?.message}`);
 };
 
 // 修改 RPC 请求限制器
@@ -1822,7 +1764,7 @@ function LPPositions({ walletAddress, privateKey }) {
           }
 
           console.log('✅ 撤池交易成功确认!');
-          break; // 如果成功，跳出重试循环
+          break;
         } catch (error) {
           console.error(`❌ 撤池操作失败 (第 ${attempt}/${MAX_RETRIES} 次尝试):`, error);
           
@@ -1830,15 +1772,23 @@ function LPPositions({ walletAddress, privateKey }) {
             throw new Error('撤池操作失败: ' + (error.message || '未知错误'));
           }
 
+          // 如果是RPC错误，尝试切换节点
+          if (error.message.includes('failed to fetch') || 
+              error.message.includes('network error') ||
+              error.message.includes('timeout')) {
+            try {
+              provider = await getWorkingProvider(true);
+              continue;
+            } catch (e) {
+              console.error('无法获取新的RPC节点:', e);
+            }
+          }
+
           // 计算下一次重试的延迟时间（指数退避）
           const delay = RETRY_DELAY * Math.pow(2, attempt - 1);
           console.log(`等待 ${delay/1000} 秒后进行第 ${attempt + 1} 次尝试...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
-      }
-
-      if (!receipt) {
-        throw new Error('撤池操作失败: 未获得交易收据');
       }
 
       // 解析交易日志以获取撤池获得的代币数量
@@ -1885,6 +1835,13 @@ function LPPositions({ walletAddress, privateKey }) {
       const hasUSDT = isToken0USDT || isToken1USDT;
       const hasWBNB = isToken0WBNB || isToken1WBNB;
 
+      console.log('isToken0USDT:', isToken0USDT);
+      console.log('isToken1USDT:', isToken1USDT);
+      console.log('isToken0WBNB:', isToken0WBNB);
+      console.log('isToken1WBNB:', isToken1WBNB);
+      console.log('hasUSDT:', hasUSDT);
+      console.log('hasWBNB:', hasWBNB);
+
       if (hasUSDT || hasWBNB) {
         const stableToken = hasUSDT ? 'USDT' : 'WBNB';
         console.log(`TokenID ${position.tokenId} 包含${stableToken}，准备执行代币交换`);
@@ -1895,7 +1852,7 @@ function LPPositions({ walletAddress, privateKey }) {
         const nonStableAddress = (hasUSDT && isToken0USDT) || (hasWBNB && isToken0WBNB) ? position.token1 : position.token0;
 
         // 获取当前tick和价格状态
-        const currentTick = await getCurrentTick(position.poolAddress, provider);
+        const currentTick = Number(position.currentTick);
         const tickLower = Number(position.tickLower);
         const tickUpper = Number(position.tickUpper);
 
@@ -1905,14 +1862,14 @@ function LPPositions({ walletAddress, privateKey }) {
 
         if ((hasUSDT && isToken0USDT) || (hasWBNB && isToken0WBNB)) {
           // price = token1/Stable，价格和tick反向关系
-          if (currentTick > tickUpper) {
+          if (currentTick >= tickUpper) {
             poolWithdrawReason = "priceIsLow";
           } else if (currentTick < tickLower) {
             poolWithdrawReason = "priceIsHigh";
           }
         } else {
           // token1是Stable，price = token0/Stable，价格和tick正向关系
-          if (currentTick < tickLower) {
+          if (currentTick <= tickLower) {
             poolWithdrawReason = "priceIsLow";
           } else if (currentTick > tickUpper) {
             poolWithdrawReason = "priceIsHigh";
@@ -1925,7 +1882,8 @@ function LPPositions({ walletAddress, privateKey }) {
           token0Symbol: position.token0Symbol,
           token1Symbol: position.token1Symbol,
           isStrategyEnabled: strategy.priceDropWithdraw,
-          threshold: strategy.priceDropThreshold
+          threshold: strategy.priceDropThreshold,
+          poolWithdrawReason: poolWithdrawReason
         });
 
         if (strategy.priceDropWithdraw) {
@@ -1938,33 +1896,27 @@ function LPPositions({ walletAddress, privateKey }) {
             lastUpdateTime: new Date(position.lastPriceUpdateTime).toLocaleString()
           });
 
-          if (isNaN(currentPrice) || isNaN(historicalPrice)) {
-            console.warn('价格数据无效:', {
-              currentPrice: position.currentPrice,
-              historicalPrice: position.historicalPrice,
-              isCurrentPriceValid: !isNaN(currentPrice),
-              isHistoricalPriceValid: !isNaN(historicalPrice)
+          if (!isNaN(currentPrice) && !isNaN(historicalPrice)) {
+            const priceDrop = (currentPrice - historicalPrice) / historicalPrice * 100;
+            
+            console.log('价格下跌计算:', {
+              priceDrop: priceDrop.toFixed(2) + '%',
+              threshold: strategy.priceDropThreshold + '%',
+              willTrigger: priceDrop >= strategy.priceDropThreshold
             });
-            return;
-          }
-
-          const priceDrop = (currentPrice - historicalPrice) / historicalPrice * 100;
-          
-          console.log('价格下跌计算:', {
-            priceDrop: priceDrop.toFixed(2) + '%',
-            threshold: strategy.priceDropThreshold + '%',
-            willTrigger: priceDrop >= strategy.priceDropThreshold
-          });
-          
-          if (priceDrop >= strategy.priceDropThreshold) {
-            console.log(`✅ 价格下跌${priceDrop.toFixed(2)}%，超过阈值${strategy.priceDropThreshold}%，触发撤池策略`);
-            poolWithdrawReason = "priceIsLow";
-          } else {
-            console.log(`❌ 价格下跌${priceDrop.toFixed(2)}%，未达到阈值${strategy.priceDropThreshold}%，不触发撤池`);
+            
+            if (priceDrop >= strategy.priceDropThreshold) {
+              console.log(`✅ 价格下跌${priceDrop.toFixed(2)}%，超过阈值${strategy.priceDropThreshold}%，触发撤池策略`);
+              poolWithdrawReason = "priceIsLow";
+            } else {
+              console.log(`❌ 价格下跌${priceDrop.toFixed(2)}%，未达到阈值${strategy.priceDropThreshold}%，不触发撤池`);
+            }
           }
         } else {
           console.log('价格下跌撤池策略未启用');
         }
+
+        console.log('poolWithdrawReason:', poolWithdrawReason);
 
         if (poolWithdrawReason === "priceIsLow") {
           // 价格低于区间，将所有非稳定代币卖出为稳定代币
@@ -2009,7 +1961,7 @@ function LPPositions({ walletAddress, privateKey }) {
               true
             );
             if (!swapResult.success) {
-              console.error(`TokenID ${position.tokenId} ${stableToken}兑换一半失败`);
+              console.error(`TokenID ${position.tokenId} 代币买入失败`);
             } else {
               console.log(`TokenID ${position.tokenId} ${stableToken}兑换一半成功，获得代币: ${swapResult.receivedAmount.toString()}`);
               
@@ -2154,9 +2106,22 @@ function LPPositions({ walletAddress, privateKey }) {
       onClose();
     } catch (error) {
       console.error('移除流动性失败:', error);
+      
+      // 提供更详细的错误信息
+      let errorMessage = '移除流动性时发生错误';
+      if (error.message.includes('failed to fetch')) {
+        errorMessage = 'RPC节点连接失败，请稍后重试';
+      } else if (error.message.includes('insufficient funds')) {
+        errorMessage = 'BNB余额不足以支付gas费';
+      } else if (error.message.includes('user rejected')) {
+        errorMessage = '用户取消了交易';
+      } else if (error.message.includes('nonce')) {
+        errorMessage = '交易nonce错误，请刷新页面重试';
+      }
+      
       toast({
         title: "撤池失败",
-        description: error.message || "移除流动性时发生错误",
+        description: errorMessage,
         status: "error",
         duration: 5000,
         isClosable: true,

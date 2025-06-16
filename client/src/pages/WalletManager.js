@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -21,14 +20,13 @@ import {
   Link,
   Tooltip,
 } from '@chakra-ui/react';
-import { ViewIcon, ViewOffIcon, ArrowBackIcon, ExternalLinkIcon } from '@chakra-ui/icons';
+import { ViewIcon, ViewOffIcon, ExternalLinkIcon } from '@chakra-ui/icons';
 import { ethers } from 'ethers';
 import TokenBalance from '../components/TokenBalance';
 import LPPositions from '../components/LPPositions';
 import { encryptData, decryptData } from '../utils/encryption';
 
 function WalletManager() {
-  const navigate = useNavigate();
   const [privateKey, setPrivateKey] = useState('');
   const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [walletInfo, setWalletInfo] = useState(null);
