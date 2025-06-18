@@ -207,21 +207,11 @@ const getCurrentTick = async (poolAddress, provider) => {
 
 // 添加更多BSC RPC节点
 const BSC_RPC_ENDPOINTS = [
-  'https://bsc-dataseed.binance.org',
-  'https://bsc-dataseed1.binance.org',
-  'https://bsc-dataseed2.binance.org',
-  'https://bsc-dataseed3.binance.org',
-  'https://bsc-dataseed4.binance.org',
-  'https://bsc-dataseed1.defibit.io',
-  'https://bsc-dataseed2.defibit.io',
-  'https://bsc-dataseed3.defibit.io',
-  'https://bsc-dataseed4.defibit.io',
-  'https://bsc-dataseed1.ninicoin.io',
-  'https://bsc-dataseed2.ninicoin.io',
-  'https://bsc-dataseed3.ninicoin.io',
-  'https://bsc-dataseed4.ninicoin.io',
-  'https://endpoints.omniatech.io/v1/bsc/mainnet/public',
-  'https://1rpc.io/bnb'
+  'https://bsc.publicnode.com',
+  // 'https://binance.nodereal.io',
+  // 'https://binance.llamarpc.com',
+  // 'https://bsc-dataseed2.ninicoin.io',
+  // 'https://bsc-mainnet.public.blastapi.io',
 ];
 
 // 修改 getWorkingProvider 函数
@@ -867,7 +857,7 @@ function LPPositions({ walletAddress, privateKey }) {
                     const parsedLog = erc20Interface.parseLog(log);
                     if (parsedLog && parsedLog.name === 'Transfer' && 
                         parsedLog.args.to.toLowerCase() === walletAddress.toLowerCase()) {
-                      receivedAmount = parsedLog.args.value;
+                      receivedAmount += parsedLog.args.value;
                       console.log('收到代币数量:', receivedAmount.toString());
                       break;
                     }
@@ -954,7 +944,7 @@ function LPPositions({ walletAddress, privateKey }) {
               const parsedLog = erc20Interface.parseLog(log);
               if (parsedLog && parsedLog.name === 'Transfer' && 
                   parsedLog.args.to.toLowerCase() === walletAddress.toLowerCase()) {
-                receivedAmount = parsedLog.args.value;
+                receivedAmount += parsedLog.args.value;
                 console.log('收到代币数量:', receivedAmount.toString());
                 break;
               }
