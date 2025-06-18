@@ -36,12 +36,18 @@
 2. 点击右上角的"Connect Wallet"连接钱包
 3. 选择"Liquidity"选项
 
+![image](https://github.com/user-attachments/assets/60a70cf6-4e09-45ec-8de2-4c1fdf3b9baa)
+
+
+
 ### 2. 创建新的流动性池
 1. 点击"Add Liquidity"
 2. 选择"V3"模式
 3. 选择要添加的代币对:
    - 从下拉菜单选择或输入代币合约地址
    - 确保代币地址正确（建议从官方渠道获取）
+
+
 
 ### 3. 设置参数
 1. **选择费率**
@@ -62,6 +68,10 @@
 3. **输入金额**
    - 输入一种代币的数量，系统会自动计算另一种代币所需数量
    - 或使用"Max"按钮一键输入最大可用金额
+  
+![image](https://github.com/user-attachments/assets/a63c0f15-4cf9-4644-a2de-31efa5523a99)
+
+在这里我选择BR和USDT组池子，并且在币安开对应仓位的空单套保。
 
 ### 4. 授权和确认
 1. 点击"Enable XXX"授权代币（如果是首次使用）
