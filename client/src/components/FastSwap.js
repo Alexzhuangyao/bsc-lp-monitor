@@ -23,14 +23,13 @@ import { ArrowDownIcon, ExternalLinkIcon, RepeatIcon } from '@chakra-ui/icons';
 import { ethers } from 'ethers';
 import { 
   getQuote, 
-  BSC_TOKENS,
-  sendSwapTransaction,
-  BSC_CONFIG 
-} from '../services/okxService';
+  UNICHAIN_TOKENS,
+  getSwapRoute,
+  UNICHAIN_CONFIG,
+  approveToken,
+  checkAllowance as checkAllowanceService
+} from '../services/uniswapService';
 import { debounce } from 'lodash';
-
-// BSC RPC节点
-const BSC_RPC = 'https://binance.nodereal.io';
 
 // ERC20代币ABI
 const ERC20_ABI = [
@@ -40,7 +39,7 @@ const ERC20_ABI = [
 ];
 
 function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
-  const [fromToken, setFromToken] = useState('BNB');
+  const [fromToken, setFromToken] = useState('NATIVE');
   const [toToken, setToToken] = useState('USDT');
   const [amount, setAmount] = useState('');
   const [quote, setQuote] = useState(null);
@@ -64,35 +63,23 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
       const fetchQuote = async () => {
         try {
           setLoading(true);
-          console.log('获取报价，参数:', { fromToken, toToken, amount });
+          console.log('获取Uniswap报价，参数:', { fromToken, toToken, amount });
           
-          const fromTokenDecimals = BSC_TOKENS[fromToken].decimals;
-          const amountInWei = ethers.parseUnits(amount, fromTokenDecimals).toString();
-
-          console.log('准备参数:', {
-            fromTokenAddress: BSC_TOKENS[fromToken].address,
-            toTokenAddress: BSC_TOKENS[toToken].address,
-            amountInWei,
-            userWalletAddress: walletAddress
-          });
+          const fromTokenInfo = UNICHAIN_TOKENS[fromToken];
+          const toTokenInfo = UNICHAIN_TOKENS[toToken];
+          const amountInWei = ethers.parseUnits(amount, fromTokenInfo.decimals).toString();
 
           const quoteResult = await getQuote({
-            fromTokenAddress: BSC_TOKENS[fromToken].address,
-            toTokenAddress: BSC_TOKENS[toToken].address,
+            fromTokenAddress: fromTokenInfo.address,
+            toTokenAddress: toTokenInfo.address,
             amount: amountInWei,
-            slippage: '0.005',
-            userWalletAddress: walletAddress
           });
 
           console.log('报价结果:', quoteResult);
           
-          if (quoteResult && 
-              typeof quoteResult === 'object' && 
-              'toTokenAmount' in quoteResult &&
-              'priceImpactPercentage' in quoteResult) {
+          if (quoteResult && quoteResult.toTokenAmount) {
             setQuote(quoteResult);
           } else {
-            console.error('无效的报价数据:', quoteResult);
             throw new Error('获取报价失败: 返回数据格式不正确');
           }
         } catch (error) {
@@ -135,7 +122,7 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
         debouncedFetch.cancel();
       };
     },
-    [walletAddress, toast, setLoading, setQuote]
+    [toast, setLoading, setQuote] // 移除了不必要的walletAddress依赖
   );
 
   // 获取代币余额
@@ -143,19 +130,19 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
     if (!walletAddress || !fromToken) return;
 
     try {
-      const provider = new ethers.JsonRpcProvider(BSC_RPC);
+      const provider = new ethers.JsonRpcProvider(UNICHAIN_CONFIG.rpcUrl);
       
-      if (fromToken === 'BNB') {
+      if (fromToken === 'NATIVE') {
         const balance = await provider.getBalance(walletAddress);
         setFromTokenBalance(ethers.formatEther(balance));
       } else {
         const contract = new ethers.Contract(
-          BSC_TOKENS[fromToken].address,
+          UNICHAIN_TOKENS[fromToken].address,
           ERC20_ABI,
           provider
         );
         const balance = await contract.balanceOf(walletAddress);
-        setFromTokenBalance(ethers.formatUnits(balance, BSC_TOKENS[fromToken].decimals));
+        setFromTokenBalance(ethers.formatUnits(balance, UNICHAIN_TOKENS[fromToken].decimals));
       }
     } catch (error) {
       console.error('Error fetching balance:', error);
@@ -170,34 +157,24 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
 
   // 检查授权状态
   const checkAllowance = useCallback(async () => {
-    if (!walletAddress || !amount || fromToken === 'BNB') {
+    if (!walletAddress || !amount || fromToken === 'NATIVE') {
       setNeedsApproval(false);
       return;
     }
 
     try {
-      console.log('检查授权状态:', {
-          tokenAddress: BSC_TOKENS[fromToken].address,
-        walletAddress,
-        amount
-      });
+      const provider = new ethers.JsonRpcProvider(UNICHAIN_CONFIG.rpcUrl);
+      const amountInWei = ethers.parseUnits(amount, UNICHAIN_TOKENS[fromToken].decimals);
 
-      const provider = new ethers.JsonRpcProvider(BSC_RPC);
-      const tokenContract = new ethers.Contract(
-        BSC_TOKENS[fromToken].address,
-        ERC20_ABI,
+      const isApproved = await checkAllowanceService({
+        tokenAddress: UNICHAIN_TOKENS[fromToken].address,
+        owner: walletAddress,
+        spender: UNICHAIN_CONFIG.uniswap_router,
+        amount: amountInWei,
         provider
-      );
-
-      const amountInWei = ethers.parseUnits(amount, BSC_TOKENS[fromToken].decimals);
-      const allowance = await tokenContract.allowance(walletAddress, BSC_CONFIG.APPROVE_ROUTER);
-
-      console.log('当前授权额度:', {
-        allowance: allowance.toString(),
-        required: amountInWei.toString()
       });
 
-      setNeedsApproval(allowance < amountInWei);
+      setNeedsApproval(!isApproved);
     } catch (error) {
       console.error('检查授权错误:', error);
       setNeedsApproval(true);
@@ -218,26 +195,14 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
 
     try {
       setApproving(true);
-      console.log('开始授权:', {
-        tokenAddress: BSC_TOKENS[fromToken].address,
-        amount
-      });
-
-      const provider = new ethers.JsonRpcProvider(BSC_RPC);
-      const wallet = new ethers.Wallet(privateKey, provider);
-      const tokenContract = new ethers.Contract(
-        BSC_TOKENS[fromToken].address,
-        ERC20_ABI,
-        wallet
-      );
-
-      // 使用最大值进行授权
-      const maxApprovalAmount = ethers.MaxUint256;
       
-      console.log('发送授权交易');
-      const tx = await tokenContract.approve(BSC_CONFIG.APPROVE_ROUTER, maxApprovalAmount, {
-        gasLimit: 100000, // 设置一个合理的 gas limit
-        gasPrice: await provider.getFeeData().then(data => data.gasPrice) // 获取当前 gas price
+      const provider = new ethers.JsonRpcProvider(UNICHAIN_CONFIG.rpcUrl);
+      const wallet = new ethers.Wallet(privateKey, provider);
+      
+      const tx = await approveToken({
+        tokenAddress: UNICHAIN_TOKENS[fromToken].address,
+        spender: UNICHAIN_CONFIG.uniswap_router,
+        wallet
       });
       
       console.log('授权交易已发送:', tx.hash);
@@ -302,30 +267,100 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
 
     try {
       setSwapping(true);
-      console.log('🚀 开始执行BSC链代币交换...');
-      // 1. 获取交换数据
-      const amountInWei = ethers.parseUnits(amount, BSC_TOKENS[fromToken].decimals).toString();
-
-      console.log('📊 获取交换交易数据...');
-      const swapResult = await sendSwapTransaction({
-        fromTokenAddress: BSC_TOKENS[fromToken].address,
-        toTokenAddress: BSC_TOKENS[toToken].address,
-        amount: amountInWei.toString(),
-        slippage: '0.005',
-        userWalletAddress: walletAddress,
-        privateKey
-      });
-
-      if (!swapResult || !swapResult.hash) {
-        throw new Error('获取交换数据失败');
+      console.log('🚀 开始执行Unichain链Uniswap V4交换...');
+      const fromTokenInfo = UNICHAIN_TOKENS[fromToken];
+      const toTokenInfo = UNICHAIN_TOKENS[toToken];
+      const amountInWei = ethers.parseUnits(amount, fromTokenInfo.decimals);
+      
+      // 如果不是原生币，需要先检查并授权
+      if (fromToken !== 'NATIVE') {
+        const provider = new ethers.JsonRpcProvider(UNICHAIN_CONFIG.rpcUrl);
+        const wallet = new ethers.Wallet(privateKey, provider);
+        
+        // 检查授权
+        const isApproved = await checkAllowanceService({
+          tokenAddress: fromTokenInfo.address,
+          owner: walletAddress,
+          spender: UNICHAIN_CONFIG.uniswap_router,
+          amount: amountInWei,
+          provider
+        });
+        
+        if (!isApproved) {
+          console.log('需要授权代币，正在发送授权交易...');
+          const approveTx = await approveToken({
+            tokenAddress: fromTokenInfo.address,
+            spender: UNICHAIN_CONFIG.uniswap_router,
+            wallet
+          });
+          
+          toast({
+            title: '授权交易已发送',
+            description: '请等待交易确认',
+            status: 'info',
+            duration: 5000,
+            isClosable: true,
+          });
+          
+          await approveTx.wait();
+          
+          toast({
+            title: '授权成功',
+            description: '代币已成功授权',
+            status: 'success',
+            duration: 3000,
+            isClosable: true,
+          });
+        }
       }
 
-      console.log('📡 交易已发送:', swapResult.hash);
-      setTxHash(swapResult.hash);
+      console.log('📊 获取交换路由数据...');
+      const swapTxData = await getSwapRoute({
+        fromTokenAddress: fromTokenInfo.address,
+        toTokenAddress: toTokenInfo.address,
+        amount: amountInWei.toString(),
+        userWalletAddress: walletAddress,
+        slippage: '0.005', // 0.5%
+      });
+
+      if (!swapTxData || !swapTxData.to || !swapTxData.data) {
+        throw new Error('获取交换路由失败');
+      }
+      
+      const provider = new ethers.JsonRpcProvider(UNICHAIN_CONFIG.rpcUrl);
+      const wallet = new ethers.Wallet(privateKey, provider);
+      
+      // 估算gas
+      const gasEstimate = await wallet.estimateGas({
+        to: swapTxData.to,
+        data: swapTxData.data,
+        value: swapTxData.value || '0'
+      }).catch(() => ethers.toBigInt('500000')); // 如果估算失败则使用默认值
+
+      // 使用ethers.js的方式计算gas限制
+      const gasLimitWithBuffer = gasEstimate * ethers.toBigInt('120') / ethers.toBigInt('100'); // 增加20%的gas余量
+
+      const tx = {
+        to: swapTxData.to,
+        data: swapTxData.data,
+        value: swapTxData.value || '0',
+        gasLimit: gasLimitWithBuffer,
+        gasPrice: await provider.getFeeData().then(data => data.gasPrice)
+      };
+
+      console.log('发送交易:', {
+        to: tx.to,
+        value: tx.value,
+        gasLimit: tx.gasLimit.toString(),
+        gasPrice: tx.gasPrice?.toString() || 'auto'
+      });
+      
+      const sentTx = await wallet.sendTransaction(tx);
+      setTxHash(sentTx.hash);
       
       toast({
         title: '交易已发送',
-        description: '请等待交易确认',
+        description: `交易哈希: ${sentTx.hash}`,
         status: 'info',
         duration: 5000,
         isClosable: true,
@@ -333,7 +368,7 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
 
       // 等待交易确认
       console.log('⏳ 等待交易确认...');
-      const receipt = await swapResult.wait();
+      const receipt = await sentTx.wait();
       
       if (receipt.status === 1) {
         console.log('✅ 交换交易成功');
@@ -436,20 +471,17 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
       const refreshQuote = async () => {
         try {
           setIsRefreshing(true);
-          console.log('刷新报价，参数:', { fromToken, toToken, amount });
           
-          const fromTokenDecimals = BSC_TOKENS[fromToken].decimals;
-          const amountInWei = ethers.parseUnits(amount, fromTokenDecimals).toString();
+          const fromTokenInfo = UNICHAIN_TOKENS[fromToken];
+          const toTokenInfo = UNICHAIN_TOKENS[toToken];
+          const amountInWei = ethers.parseUnits(amount, fromTokenInfo.decimals).toString();
           
           const quoteResult = await getQuote({
-            fromTokenAddress: BSC_TOKENS[fromToken].address,
-            toTokenAddress: BSC_TOKENS[toToken].address,
+            fromTokenAddress: fromTokenInfo.address,
+            toTokenAddress: toTokenInfo.address,
             amount: amountInWei,
-            slippage: '0.005'
           });
 
-          console.log('刷新报价结果:', quoteResult);
-          
           if (quoteResult) {
             setQuote(quoteResult);
           }
@@ -480,16 +512,15 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
     
     try {
       setIsRefreshing(true);
-      console.log('手动刷新报价，参数:', { fromToken, toToken, amount });
-      
-      const fromTokenDecimals = BSC_TOKENS[fromToken].decimals;
-      const amountInWei = ethers.parseUnits(amount, fromTokenDecimals).toString();
+
+      const fromTokenInfo = UNICHAIN_TOKENS[fromToken];
+      const toTokenInfo = UNICHAIN_TOKENS[toToken];
+      const amountInWei = ethers.parseUnits(amount, fromTokenInfo.decimals).toString();
       
       const quoteResult = await getQuote({
-        fromTokenAddress: BSC_TOKENS[fromToken].address,
-        toTokenAddress: BSC_TOKENS[toToken].address,
+        fromTokenAddress: fromTokenInfo.address,
+        toTokenAddress: toTokenInfo.address,
         amount: amountInWei,
-        slippage: '0.005'
       });
 
       console.log('手动刷新报价结果:', quoteResult);
@@ -552,9 +583,9 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
                       onChange={handleFromTokenChange}
                       width="40%"
                     >
-                      {Object.keys(BSC_TOKENS).map((token) => (
+                      {Object.keys(UNICHAIN_TOKENS).map((token) => (
                         <option key={token} value={token}>
-                          {BSC_TOKENS[token].symbol}
+                          {UNICHAIN_TOKENS[token].symbol}
                         </option>
                       ))}
                     </Select>
@@ -594,7 +625,7 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
                   <Text fontSize="sm">To (Estimated)</Text>
                   <HStack width="100%" spacing={4}>
                     <Input
-                      value={quote ? formatTokenAmount(quote.toTokenAmount, BSC_TOKENS[toToken].decimals) : ''}
+                      value={quote ? formatTokenAmount(quote.toTokenAmount, UNICHAIN_TOKENS[toToken].decimals) : ''}
                       isReadOnly
                       placeholder="0.0"
                       fontSize="2xl"
@@ -605,9 +636,9 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
                       onChange={handleToTokenChange}
                       width="40%"
                     >
-                      {Object.keys(BSC_TOKENS).map((token) => (
+                      {Object.keys(UNICHAIN_TOKENS).map((token) => (
                         <option key={token} value={token}>
-                          {BSC_TOKENS[token].symbol}
+                          {UNICHAIN_TOKENS[token].symbol}
                         </option>
                       ))}
                     </Select>
@@ -633,13 +664,13 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
 
             {txHash && (
               <Link
-                href={`https://bscscan.com/tx/${txHash}`}
+                href={`${UNICHAIN_CONFIG.explorerUrl}/tx/${txHash}`}
                 isExternal
                 color="blue.500"
                 fontSize="sm"
                 mt={2}
               >
-                View transaction on BscScan <ExternalLinkIcon mx="2px" />
+                View transaction on Explorer <ExternalLinkIcon mx="2px" />
               </Link>
             )}
 
@@ -664,26 +695,26 @@ function FastSwap({ isOpen, onClose, walletAddress, privateKey }) {
                         />
                       </HStack>
                       <Text fontSize="sm" color={isRefreshing ? "gray.500" : "inherit"}>
-                        {Number(quote.priceImpactPercentage).toFixed(2)}%
+                        {Number(quote.priceImpactPercentage || 0).toFixed(2)}%
                       </Text>
                     </HStack>
                     <HStack width="100%" justify="space-between">
                       <Text fontSize="sm">Estimated Gas Fee</Text>
                       <Text fontSize="sm" color={isRefreshing ? "gray.500" : "inherit"}>
-                        {ethers.formatEther(quote.estimateGasFee)} BNB
+                        {ethers.formatEther(quote.estimateGasFee || '0')} ETH
                       </Text>
                     </HStack>
                     <HStack width="100%" justify="space-between">
                       <Text fontSize="sm">Trading Fee</Text>
                       <Text fontSize="sm" color={isRefreshing ? "gray.500" : "inherit"}>
-                        {Number(quote.tradeFee).toFixed(4)}%
+                        {Number(quote.tradeFee || 0).toFixed(4)}%
                       </Text>
                     </HStack>
                     {quote.dexRouterList && quote.dexRouterList[0] && quote.dexRouterList[0].subRouterList && quote.dexRouterList[0].subRouterList[0] && (
                       <HStack width="100%" justify="space-between">
                         <Text fontSize="sm">Route</Text>
                         <Text fontSize="sm" color={isRefreshing ? "gray.500" : "inherit"}>
-                          {quote.dexRouterList[0].subRouterList[0].dexProtocol?.[0]?.dexName || 'Unknown DEX'}
+                          {quote.dexRouterList[0].subRouterList[0].dexProtocol?.[0]?.dexName || 'Uniswap V3'}
                         </Text>
                       </HStack>
                     )}

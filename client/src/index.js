@@ -6,6 +6,8 @@ import WalletManager from './pages/WalletManager';
 import { initWeb3 } from './utils/web3';
 import theme from './theme';
 import ErrorBoundary from './components/ErrorBoundary';
+// 导入修复脚本 - 用于解决LP仓位加载问题
+import './scripts/fixLoadingState';
 
 // Initialize Web3
 initWeb3();
